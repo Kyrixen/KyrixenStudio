@@ -1,0 +1,42 @@
+.root {
+    -fx-background-color: #202020;
+}
+
+
+.title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.subtitle {
+    -fx-font-size: 14px;
+    -fx-text-fill: #aaaaaa;
+}
+
+.sectitle {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+
+.list-cell {
+    -fx-background-color: #2b2b2b;
+    -fx-text-fill: white;
+    -fx-padding: 6 10;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: #353535;
+}
+
+.list-cell:filled:selected {
+    -fx-background-color: #3d6dcc;
+    -fx-text-fill: white;
+}
+
+
+.button {
+    -fx-font-size: 14px;
+}
