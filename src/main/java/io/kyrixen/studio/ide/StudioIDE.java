@@ -4,6 +4,9 @@ import java.io.File;
 
 import io.kyrixen.studio.Vars;
 import io.kyrixen.studio.ide.editor.Editor;
+import io.kyrixen.studio.ide.lsp.JDT;
+import io.kyrixen.studio.ide.shells.Console;
+import io.kyrixen.studio.ide.shells.Terminal;
 import io.kyrixen.studio.project.Project;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
@@ -26,7 +29,7 @@ public class StudioIDE {
     private final BorderPane root;
 
     private final Project project;
-
+    private final JDT jdtls;
 
     public StudioIDE(Stage stage, Project project) {
         
@@ -37,6 +40,9 @@ public class StudioIDE {
 
         this.project = project;
 
+        this.jdtls = new JDT(project);
+        jdtls.launchJDT();
+        
         initializeStage();
         initializeLayout();
 
@@ -53,7 +59,8 @@ public class StudioIDE {
         stage.getIcons().add(new Image("/icons/studio.png"));
 
         stage.setScene(scene);
-        
+        stage.setOnCloseRequest(event -> jdtls.stopJDT());
+
         stage.setMinWidth(960);
         stage.setMinHeight(540);
 

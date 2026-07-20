@@ -7,7 +7,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.kyrixen.studio.ide.JSConsole;
+import io.kyrixen.studio.ide.shells.JSConsole;
 import javafx.concurrent.Worker;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.web.WebEngine;

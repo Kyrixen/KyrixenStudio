@@ -39,8 +39,8 @@ public class ProjectGenerator {
 
     private static void copyAndExtract(String dirPath) throws IOException {
 
-        try (InputStream in = ProjectGenerator.class.getResourceAsStream("/template.zip")) {
-            if (in == null) throw new IOException("template.zip not found");
+        try(InputStream in = ProjectGenerator.class.getResourceAsStream("/template.zip")) {
+            if(in == null) throw new IOException("template.zip not found");
             Files.copy(in, Paths.get(dirPath, "template.zip"));
         }
         
@@ -150,10 +150,10 @@ public class ProjectGenerator {
 
     private static void unzip(Path zip, String targetFolder) {
 
-        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zip))) {
+        try(ZipInputStream zis = new ZipInputStream(Files.newInputStream(zip))) {
 
             ZipEntry entry = zis.getNextEntry();
-            while (entry != null) {
+            while(entry != null) {
 
                 String output = targetFolder + "/" + entry.getName();
 
