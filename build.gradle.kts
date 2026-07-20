@@ -20,7 +20,7 @@ java {
 
 javafx {
     version = "21"
-    modules = listOf("javafx.controls")
+    modules = listOf("javafx.controls", "javafx.web")
 }
 
 application {

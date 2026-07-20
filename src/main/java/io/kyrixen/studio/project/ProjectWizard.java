@@ -260,6 +260,7 @@ public class ProjectWizard {
 
         Button cancelB = new Button("Cancel");
         cancelB.setOnAction(event -> {
+            project = null;
             stage.close();
         });
         options.getChildren().add(cancelB);

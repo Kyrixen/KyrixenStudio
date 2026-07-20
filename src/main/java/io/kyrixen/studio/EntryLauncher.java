@@ -2,15 +2,16 @@ package io.kyrixen.studio;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import dev.kyrixen.libs.logger.Logger;
+import io.kyrixen.studio.ide.StudioIDE;
 import io.kyrixen.studio.project.Project;
 import io.kyrixen.studio.project.ProjectGenerator;
 import io.kyrixen.studio.project.ProjectGeneratorLegacy;
 import io.kyrixen.studio.project.ProjectWizard;
 import io.kyrixen.studio.project.fsave.ProjectFile;
 import io.kyrixen.studio.project.fsave.ProjectScanner;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -36,6 +37,7 @@ public class EntryLauncher {
 
     private Project currentProject = null;
     private Button openP;
+
 
     public EntryLauncher(Stage stage) {
         
@@ -187,6 +189,7 @@ public class EntryLauncher {
     private void openProject() {
         if(currentProject == null) return;
         Logger.LOGGER.info("LAUNCHER", "Opening project...");
+        new StudioIDE(stage, currentProject);
     }
     
     private void openFolder() {
@@ -196,9 +199,13 @@ public class EntryLauncher {
 
         File directory = chooser.showDialog(stage);
         if(directory == null) return;
-        if(!Files.exists(Paths.get(directory.toPath().toAbsolutePath().toString() + "/.kstudio/project.json"))) return;
+        if(!Files.exists(directory.toPath().toAbsolutePath().resolve(".kstudio/project.json"))) return;
     
+        Project project = ProjectFile.load(directory.toPath().toAbsolutePath().toString());
+        if(project == null) return;
+
         Logger.LOGGER.info("LAUNCHER", "Opening folder...");
+        new StudioIDE(stage, project);
 
     }
     
