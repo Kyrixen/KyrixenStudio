@@ -21,6 +21,7 @@ public class ProjectGeneratorLegacy {
 
         try {
                 
+            Files.createDirectories(project.getLocation());
             copyAndExtract(project.getLocation().toAbsolutePath().toString());
             replacePlaceholders(project);
             replacePackages(project);

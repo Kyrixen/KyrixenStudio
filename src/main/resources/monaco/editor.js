@@ -30,6 +30,7 @@ require(["vs/editor/editor.main"], async () => {
 
     console.log("Studio editor loading");
 
+    window.monacoEditorReady = true;
     if(window.studio) window.studio.editorReady();
     else console.error("Studio bridge not ready");
     

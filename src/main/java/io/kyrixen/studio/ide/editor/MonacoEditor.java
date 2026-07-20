@@ -36,6 +36,7 @@ public class MonacoEditor extends BorderPane {
 
                 window.setMember("consoleBridge", new JSConsole());
                 window.setMember("studio", this);
+                webEngine.executeScript("if(window.monacoEditorReady) window.studio.editorReady();");
 
             }
 
@@ -47,6 +48,7 @@ public class MonacoEditor extends BorderPane {
 
     public void editorReady() {
 
+        if(ready) return;
         ready = true;
         if(!waitFiles.isEmpty()) {
             for(File waitFile : waitFiles) { open(waitFile); }
