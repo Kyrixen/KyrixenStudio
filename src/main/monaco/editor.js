@@ -2,7 +2,7 @@ import * as monaco from "monaco-editor";
 
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker?worker";
-import { startLSP, didOpen, didChange } from "./lsp";
+import { startLSP, didOpen, didClose, didChange, didSave } from "./lsp";
 
 self.MonacoEnvironment = {
     getWorker(_, label) {
@@ -108,8 +108,31 @@ export function requestSave() {
     window.studio.saveFile(model.uri.fsPath, model.getValue());
     window.studio.markSaved(model.uri.fsPath, true);
 
+    if(model.getLanguageId() === "java") { didSave(); window.consoleBridge.debug("didSave: " + model.uri.toString()); }
+
 }
 window.requestSave = requestSave;
+
+
+export function closeFile(path) {
+
+    const model = models.get(path);
+    if(!model) return;
+
+    if(model.getLanguageId() === "java") {
+        didClose(model.uri.toString());
+        jdtFileVer.delete(model.uri.toString());
+        openedJdt.delete(model.uri.toString());
+        window.consoleBridge.debug("didClose: " + model.uri.toString());
+    }
+
+    model.dispose();
+
+    models.delete(path);
+
+};
+window.closeFile = closeFile;
+
 
 editor.addAction({
     

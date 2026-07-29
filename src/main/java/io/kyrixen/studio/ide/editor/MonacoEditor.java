@@ -253,6 +253,16 @@ public class MonacoEditor extends BorderPane {
     }
 
 
+    public void close(File file) {
+
+        if(!editorInit) return;
+
+        webEngine.executeScript("""
+            window.closeFile("%s");
+        """.formatted(file.getAbsolutePath().replace("\\", "\\\\")));
+
+    }
+
     public void stop() {
         if(server != null) server.stop(0);   
     }

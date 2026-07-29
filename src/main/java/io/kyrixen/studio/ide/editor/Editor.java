@@ -40,6 +40,8 @@ public class Editor extends BorderPane {
 
         monaco.open(file);
 
+        tab.setOnClosed(event -> monaco.close(file));
+
     }
 
     public void isDirty(String file, boolean dirty) {

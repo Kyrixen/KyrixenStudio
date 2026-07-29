@@ -16,4 +16,4 @@ dist/
 node_modules/
 
 # Ignore failed prototypes directory
-failed/*
+failed/

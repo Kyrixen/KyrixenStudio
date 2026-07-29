@@ -83,6 +83,7 @@ function notifyNow(method, params) {
 export function didOpen(path, text) {
 
     notify("textDocument/didOpen", {
+        
         textDocument: {
 
             uri: path,
@@ -91,6 +92,19 @@ export function didOpen(path, text) {
             text: text
 
         }
+    
+    });
+
+}
+
+export function didClose(uri) {
+
+    notify("textDocument/didClose", {
+    
+        textDocument: {
+            uri
+        }
+    
     });
 
 }
@@ -106,6 +120,18 @@ export function didChange(uri, version, text) {
  
         contentChanges: [{ text }]
     
+    });
+
+}
+
+export function didSave(uri) {
+
+    notify("textDocument/didSave", {
+ 
+        textDocument: {
+            uri
+        }
+ 
     });
 
 }
