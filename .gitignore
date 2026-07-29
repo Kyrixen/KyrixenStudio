@@ -11,6 +11,9 @@ build
 .vscode/
 .codex
 
-# Ignore Monaco build and failed prototypes directory
-monaco/
-failed/
+# Ignore Nodejs build and cache directory
+dist/
+node_modules/
+
+# Ignore failed prototypes directory
+failed/*
