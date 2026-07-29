@@ -1,9 +1,12 @@
 package io.kyrixen.studio.ide;
 
 import java.io.File;
+import java.net.InetSocketAddress;
 
+import dev.kyrixen.libs.logger.Logger;
 import io.kyrixen.studio.Vars;
 import io.kyrixen.studio.ide.editor.Editor;
+import io.kyrixen.studio.ide.lsp.Bridge;
 import io.kyrixen.studio.ide.lsp.JDT;
 import io.kyrixen.studio.ide.shells.Console;
 import io.kyrixen.studio.ide.shells.Terminal;
@@ -28,8 +31,12 @@ public class StudioIDE {
     private final Scene scene;
     private final BorderPane root;
 
+    private final Editor editor;
+
     private final Project project;
     private final JDT jdtls;
+    private final Bridge bridge;
+    
 
     public StudioIDE(Stage stage, Project project) {
         
@@ -42,6 +49,11 @@ public class StudioIDE {
 
         this.jdtls = new JDT(project);
         jdtls.launchJDT();
+
+        bridge = new Bridge(new InetSocketAddress("127.0.0.1", 8080), jdtls);
+        bridge.start();
+        
+        this.editor = new Editor(project);
         
         initializeStage();
         initializeLayout();
@@ -59,7 +71,7 @@ public class StudioIDE {
         stage.getIcons().add(new Image("/icons/studio.png"));
 
         stage.setScene(scene);
-        stage.setOnCloseRequest(event -> jdtls.stopJDT());
+        stage.setOnCloseRequest(event -> stopIDE());
 
         stage.setMinWidth(960);
         stage.setMinHeight(540);
@@ -70,7 +82,6 @@ public class StudioIDE {
 
         root.setTop(createHeader());
 
-        BorderPane editor = new Editor();
         editor.setMinWidth(550);
         editor.setMinHeight(240);
 
@@ -114,6 +125,17 @@ public class StudioIDE {
 
 
         return header;
+
+    }
+
+
+    private void stopIDE() {
+    
+        Logger.LOGGER.info("IDE", "Stopping IDE...");
+        
+        jdtls.stopJDT();
+        bridge.shutdown();
+        editor.stopServer();
 
     }
 

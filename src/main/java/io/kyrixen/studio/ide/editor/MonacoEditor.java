@@ -1,30 +1,54 @@
 package io.kyrixen.studio.ide.editor;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
+import dev.kyrixen.libs.logger.Logger;
+import io.kyrixen.studio.Vars;
 import io.kyrixen.studio.ide.shells.JSConsole;
+import io.kyrixen.studio.project.Project;
+import io.kyrixen.studio.project.ProjectGenerator;
 import javafx.concurrent.Worker;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
 import netscape.javascript.JSObject;
 
+import com.sun.net.httpserver.HttpServer;
+
 public class MonacoEditor extends BorderPane {
 
     private final WebView webView = new WebView();
     private final WebEngine webEngine = webView.getEngine();
+    private HttpServer server;
 
-    private boolean ready = false;
+    private final Project project;
+    private final Editor editor;
+
+    private boolean editorInit = false;
     private final List<File> waitFiles;
 
+    private final Path monacoPath = Paths.get(Vars.studioPath).resolve(".internal/monaco");
 
-    public MonacoEditor() {
+
+    public MonacoEditor(Project project, Editor editor) {
         
+        this.project = project;
+        this.editor = editor;
+
         this.waitFiles = new ArrayList<>();
 
         this.setCenter(webView);
@@ -36,20 +60,23 @@ public class MonacoEditor extends BorderPane {
 
                 window.setMember("consoleBridge", new JSConsole());
                 window.setMember("studio", this);
-                webEngine.executeScript("if(window.monacoEditorReady) window.studio.editorReady();");
-
+            
             }
 
         });
 
-        webEngine.load(getClass().getResource("/monaco/index.html").toExternalForm());
+        String monacoUrl = setupMonaco();
+        if(monacoUrl != null) webEngine.load(monacoUrl);
 
     }
 
-    public void editorReady() {
+    public void editorDone() {
 
-        if(ready) return;
-        ready = true;
+        if(editorInit) return;
+        editorInit = true;
+
+        webEngine.executeScript("window.setupLSP()");
+
         if(!waitFiles.isEmpty()) {
             for(File waitFile : waitFiles) { open(waitFile); }
             waitFiles.clear();
@@ -57,10 +84,14 @@ public class MonacoEditor extends BorderPane {
 
     }
 
+    public String getProjectUri() {
+        return project.getLocation().toUri().toString();
+    }
+
 
     public void open(File file) {
 
-        if(!ready) { waitFiles.add(file); return; }
+        if(!editorInit) { waitFiles.add(file); return; }
 
         webEngine.executeScript("""
             window.openFile("%s");
@@ -71,7 +102,159 @@ public class MonacoEditor extends BorderPane {
     public String readFile(String path) {
         try {
             return Files.readString(Paths.get(path));
-        } catch (IOException e) { e.printStackTrace(); return ""; }
+        } catch(IOException e) { e.printStackTrace(); return ""; }
+    }
+
+    public void saveFile(String path, String content) {
+        
+        try {
+            Files.writeString(Paths.get(path), content);
+        } catch(IOException e) { e.printStackTrace(); return; }
+
+    }
+
+
+    public void markSaved(String file, boolean saved) {
+        editor.isDirty(file, !saved);
+    }
+
+
+    private String setupMonaco() {
+
+        try {
+
+            refreshMonaco();
+
+            int port = startMonacoServer();
+            return "http://" + "127.0.0.1" + ":" + port + "/index.html";
+
+        } catch(IOException e) { Logger.LOGGER.error("EDITOR", "Couldnt setup Monaco: " + e); return null; }
+        
+    }
+
+    private void refreshMonaco() {
+
+        try {
+
+            if(Files.exists(monacoPath)) {
+                
+                try (Stream<Path> paths = Files.walk(monacoPath)) {
+                    for(Path path : paths.sorted(Comparator.reverseOrder()).toList()) { Files.deleteIfExists(path); }
+                }
+            
+            }
+
+            Files.createDirectories(monacoPath);
+
+            Files.createDirectories(monacoPath);
+
+            try(InputStream in = ProjectGenerator.class.getResourceAsStream("/monaco.zip")) {
+                if(in == null) throw new IOException("monaco.zip not found");
+                Files.copy(in, Paths.get(monacoPath.toAbsolutePath().toString(), "monaco.zip"));
+            }
+            
+        } catch(IOException e) { Logger.LOGGER.error("EDITOR", "Couldnt copy monaco files: " + e); }
+        
+
+        unzip(monacoPath.resolve("monaco.zip"), monacoPath.toAbsolutePath().toString());
+        try { Files.deleteIfExists(monacoPath.resolve("monaco.zip")); } catch(IOException e) { Logger.LOGGER.error("EDITOR", "Couldnt delete monaco.zip: " + e); }
+
+
+        boolean corrupted = false;
+        if(!Files.isRegularFile(monacoPath.resolve("index.html"))) corrupted = true;
+        if(!Files.isRegularFile(monacoPath.resolve("themes/style.css"))) corrupted = true;
+        if(!Files.isRegularFile(monacoPath.resolve("themes/kyrixen-dark.json"))) corrupted = true;
+
+        if(!Files.isDirectory(monacoPath.resolve("assets"))) corrupted = true;
+
+
+        if(corrupted) Logger.LOGGER.error("EDITOR", "monaco.zip did not contain a complete bundle");
+
+    }
+
+
+    private int startMonacoServer() throws IOException {
+
+        if(server != null) return server.getAddress().getPort();
+
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+
+            try {
+
+                String request = exchange.getRequestURI().getPath();
+                if(request.equals("/")) request = "/index.html";
+
+                Path requested = monacoPath.resolve(request.substring(1)).normalize();
+                if(!requested.startsWith(monacoPath) || !Files.exists(requested)) { exchange.sendResponseHeaders(404, -1); return; }
+
+                String type = Files.probeContentType(requested);
+                if(type == null) {
+                    if(requested.toString().endsWith(".js")) type = "application/javascript";
+                    else if(requested.toString().endsWith(".css")) type = "text/css";
+                    else if(requested.toString().endsWith(".html")) type = "text/html";
+                    else if(requested.toString().endsWith(".json")) type = "application/json";
+                    else type = "application/octet-stream";
+                }
+
+                exchange.getResponseHeaders().set("Content-Type", type);
+
+                byte[] bytes = Files.readAllBytes(requested);
+                exchange.sendResponseHeaders(200, bytes.length);
+
+                try(OutputStream out = exchange.getResponseBody()) { out.write(bytes); }
+
+            } catch(IOException e) {
+                Logger.LOGGER.error("EDITOR", "Failed to serve Monaco file: " + e);
+                exchange.sendResponseHeaders(500, -1);
+            } finally { exchange.close(); }
+
+        });
+
+        server.start();
+
+        int port = server.getAddress().getPort();
+        Logger.LOGGER.info("EDITOR", "Monaco server started on port " + port);
+
+        return port;
+    
+    }
+
+    private static void unzip(Path zip, String targetFolder) {
+
+        try(ZipInputStream zis = new ZipInputStream(Files.newInputStream(zip))) {
+
+            ZipEntry entry = zis.getNextEntry();
+            while(entry != null) {
+
+                String output = targetFolder + "/" + entry.getName();
+
+                if(entry.isDirectory()) Files.createDirectories(Paths.get(output));
+                else {
+
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = zis.read(buffer)) != -1) { bos.write(buffer, 0, len); }
+
+                    byte[] bytes = bos.toByteArray();
+                    Files.write(Paths.get(output), bytes);
+                
+                }
+
+                zis.closeEntry();
+                entry = zis.getNextEntry();
+
+            }
+
+        } catch(IOException e) { Logger.LOGGER.error("ZIPPER", "Failed to unzip to " + targetFolder + ": " + e); }
+    
+    }
+
+
+    public void stop() {
+        if(server != null) server.stop(0);   
     }
 
 }    

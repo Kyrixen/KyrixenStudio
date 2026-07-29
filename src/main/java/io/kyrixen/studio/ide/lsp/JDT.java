@@ -5,9 +5,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -37,14 +39,14 @@ public class JDT {
             Files.createDirectories(jdtPath);
 
             try (InputStream in = getClass().getResourceAsStream("/jdtls.zip")) {
-                if(in == null) throw new IOException("template.zip not found");
+                if(in == null) throw new IOException("jdtls.zip not found");
                 Files.copy(in, jdtPath.resolve("jdtls.zip"));
             }
             
             unzip(jdtPath.resolve("jdtls.zip"), jdtPath.toAbsolutePath().toString());
             Files.deleteIfExists(jdtPath.resolve("jdtls.zip"));
             
-        } catch(IOException e) { Logger.LOGGER.error("JDTLS", "Failed to setup JDT"); }
+        } catch(IOException e) { Logger.LOGGER.error("JDTLS", "Failed to setup JDT: " + e); }
 
     }
 
@@ -61,8 +63,8 @@ public class JDT {
             String config = getLaunchConfig();
             if(config == null) throw new IllegalStateException("Unknown OS");
             
-            Files.createDirectories(project.getLocation().resolve(".kstudio/jdt"));
-            String projectDir = project.getLocation().resolve(".kstudio/jdt").toAbsolutePath().toString();
+            Files.createDirectories(Paths.get(Vars.studioPath).resolve(".internal").resolve("jdt-workspaces").resolve(project.getName()));
+            String projectDir = Paths.get(Vars.studioPath).resolve(".internal").resolve("jdt-workspaces").resolve(project.getName()).toAbsolutePath().toString();
 
             ProcessBuilder pb = new ProcessBuilder(
                     "java",
@@ -77,38 +79,40 @@ public class JDT {
                     "-data", projectDir
             );
             
-            
             jdt = pb.start();
 
-            wireLogs(jdt.getInputStream(), "DEBUG");
-            wireLogs(jdt.getErrorStream(), "ERROR");
+            
+            Thread stderr = new Thread(() -> {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(jdt.getErrorStream()))) {
+                    reader.lines().forEach(line -> Logger.LOGGER.error("JDTLS", line));
+                } catch (IOException dontcare) {}
+            }, "JDTLS-STDERR");
 
-        } catch(IOException e) { Logger.LOGGER.error("JDTLS", "Failed to start JDT LS server"); }
+            stderr.setDaemon(true);
+            stderr.start();
+
+        } catch(IOException e) { Logger.LOGGER.error("JDTLS", "Failed to start JDT LS server: " + e); }
         if(jdt == null) throw new ExceptionInInitializerError("JDT LS process failed");
 
     }
 
     public void stopJDT() {
-        jdt.destroy();
-    }
-    
+ 
+        try {
 
-    private void wireLogs(InputStream stream, String type) {
-   
-        new Thread(() -> {
-   
-            try(BufferedReader reader = new BufferedReader(new InputStreamReader(stream))) {
-   
-                reader.lines().forEach(line -> {
-                    if(type.equals("ERROR")) Logger.LOGGER.error("JDTLS", line);
-                    else if(type.equals("DEBUG")) Logger.LOGGER.debug("JDTLS", line);
-                });
-   
-            } catch (IOException dontcare) {}
-   
-        }, "JDTLS-" + type).start();
-   
+            if(jdt != null) {
+                jdt.destroy();
+                if(!jdt.waitFor(3, TimeUnit.SECONDS)) jdt.destroyForcibly();
+            }
+
+        } catch (InterruptedException e) { Logger.LOGGER.error("JDTLS", "Failed to stop JDTLS: " + e); }
+
     }
+
+    public InputStream getInputStream() { return jdt.getInputStream(); }
+
+    public InputStream getErrorStream() { return jdt.getErrorStream(); }
+    public OutputStream getOutputStream() { return jdt.getOutputStream(); }
 
 
     private static void unzip(Path zip, String targetFolder) {

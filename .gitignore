@@ -10,3 +10,7 @@ build
 # Ignore project specific
 .vscode/
 .codex
+
+# Ignore Monaco build and failed prototypes directory
+monaco/
+failed/

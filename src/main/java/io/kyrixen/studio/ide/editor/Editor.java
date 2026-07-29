@@ -3,17 +3,21 @@ package io.kyrixen.studio.ide.editor;
 import java.io.File;
 import java.util.List;
 
+import io.kyrixen.studio.project.Project;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.BorderPane;
 
 public class Editor extends BorderPane {
 
-    private final TabPane tabs = new TabPane();
-    private final MonacoEditor monaco = new MonacoEditor();
+    private final TabPane tabs;
+    private final MonacoEditor monaco;
 
 
-    public Editor() {
+    public Editor(Project project) {
         
+        this.tabs = new TabPane();
+        this.monaco = new MonacoEditor(project, this);
+
         this.setTop(tabs);
         this.setCenter(monaco);
 
@@ -38,6 +42,18 @@ public class Editor extends BorderPane {
 
     }
 
+    public void isDirty(String file, boolean dirty) {
+
+        File f = new File(file);
+
+        EditorTab tab = findTab(f);
+        if(tab == null) return;
+
+        if(dirty) tab.setText(f.getName() + " *");
+        else tab.setText(f.getName());
+
+    }
+
 
     private EditorTab findTab(File file) {
 
@@ -46,6 +62,11 @@ public class Editor extends BorderPane {
 
         return null;
 
+    }
+
+
+    public void stopServer() {
+        monaco.stop();
     }
 
 }
