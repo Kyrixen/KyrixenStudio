@@ -73,6 +73,7 @@ window.openFile = function(path) {
             jdtFileVer.set(model.uri.toString(), 1);
 
             model.onDidChangeContent(() => {
+                if(!openedJdt.has(model.uri.toString())) return;
                 const version = (jdtFileVer.get(model.uri.toString()) ?? 1) + 1;
                 jdtFileVer.set(model.uri.toString(), version);
                 didChange(model.uri.toString(), version, model.getValue());
@@ -108,7 +109,7 @@ export function requestSave() {
     window.studio.saveFile(model.uri.fsPath, model.getValue());
     window.studio.markSaved(model.uri.fsPath, true);
 
-    if(model.getLanguageId() === "java") { didSave(); window.consoleBridge.debug("didSave: " + model.uri.toString()); }
+    if(model.getLanguageId() === "java") { didSave(model.uri.toString()); window.consoleBridge.debug("didSave: " + model.uri.toString()); }
 
 }
 window.requestSave = requestSave;
