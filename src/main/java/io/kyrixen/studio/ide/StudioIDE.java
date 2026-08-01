@@ -1,7 +1,9 @@
 package io.kyrixen.studio.ide;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 
 import dev.kyrixen.libs.logger.Logger;
 import io.kyrixen.studio.Vars;
@@ -50,10 +52,12 @@ public class StudioIDE {
         this.jdtls = new JDT(project);
         jdtls.launchJDT();
 
-        bridge = new Bridge(new InetSocketAddress("127.0.0.1", 8080), jdtls);
+        int port = findWorkingPort();
+
+        bridge = new Bridge(new InetSocketAddress("127.0.0.1", port), jdtls);
         bridge.start();
         
-        this.editor = new Editor(project);
+        this.editor = new Editor(project, port);
         
         initializeStage();
         initializeLayout();
@@ -126,6 +130,16 @@ public class StudioIDE {
 
         return header;
 
+    }
+
+
+    private int findWorkingPort() {
+        
+        try(ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
+        } catch(IOException e) { Logger.LOGGER.error("IDE", "Failed to find a free port, defaulting to 8080: " + e); return 8080; }
+    
     }
 
 

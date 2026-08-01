@@ -35,6 +35,8 @@ public class MonacoEditor extends BorderPane {
     private final WebEngine webEngine = webView.getEngine();
     private HttpServer server;
 
+    private final int editorPort;
+
     private final Project project;
     private final Editor editor;
 
@@ -44,10 +46,12 @@ public class MonacoEditor extends BorderPane {
     private final Path monacoPath = Paths.get(Vars.studioPath).resolve(".internal/monaco");
 
 
-    public MonacoEditor(Project project, Editor editor) {
+    public MonacoEditor(Project project, Editor editor, int port) {
         
         this.project = project;
         this.editor = editor;
+
+        this.editorPort = port;
 
         this.waitFiles = new ArrayList<>();
 
@@ -75,7 +79,7 @@ public class MonacoEditor extends BorderPane {
         if(editorInit) return;
         editorInit = true;
 
-        webEngine.executeScript("window.setupLSP()");
+        webEngine.executeScript("window.setupLSP(" + editorPort + ");");
 
         if(!waitFiles.isEmpty()) {
             for(File waitFile : waitFiles) { open(waitFile); }

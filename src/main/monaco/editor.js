@@ -2,7 +2,7 @@ import * as monaco from "monaco-editor";
 
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker?worker";
-import { startLSP, didOpen, didClose, didChange, didSave } from "./lsp";
+import { startLSP, didOpen, didClose, didChange, didSave, hover } from "./lsp";
 
 self.MonacoEnvironment = {
     getWorker(_, label) {
@@ -26,6 +26,35 @@ const theme = await response.json();
 
 monaco.editor.defineTheme("kyrixen-dark", theme);
 monaco.languages.register({id: "java"});
+monaco.languages.registerHoverProvider("java", {
+
+    async provideHover(model, position) {
+
+        try {
+
+            const result = await hover(model.uri.toString(), position.lineNumber - 1, position.column - 1);
+            if(!result || !result.contents) return null;
+
+            let values;
+            if(Array.isArray(result.contents)) values = result.contents;
+            else values = [result.contents];
+            
+            const contents = [];
+            for(const value of values) {
+
+                if(typeof value === "string") contents.push({ value });
+                else if(value.language) contents.push({value: `\`\`\`${value.language}\n${value.value}\n\`\`\``});
+                else if(value.value) contents.push({value: value.value});
+
+            }
+
+            return { contents };
+        
+        } catch(e) { window.consoleBridge.error(e); return null; }
+
+    }
+
+});
 
 const container = document.getElementById("container");
 editor = monaco.editor.create(container, {
@@ -45,8 +74,8 @@ editor = monaco.editor.create(container, {
 
 });
 
-export async function setupLSP() {
-    await startLSP();
+export async function setupLSP(port) {
+    await startLSP(port);
 }
 window.setupLSP = setupLSP;
 

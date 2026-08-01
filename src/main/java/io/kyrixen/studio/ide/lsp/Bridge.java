@@ -75,8 +75,9 @@ public class Bridge extends WebSocketServer {
                 while(true) {
 
                     String json = readLspMessage(in);
+                    if(json == null) break;
 
-                    if (json == null) break;
+                    Logger.LOGGER.debug("JDTLS -> LSP", json);
                     if(monaco != null) monaco.send(json);
                 
                 }

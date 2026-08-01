@@ -27,7 +27,7 @@ public class Explorer extends TreeView<File> {
         TreeItem<File> item = new TreeItem<>(file);
 
         if(file.isDirectory()) {
-            File[] children = file.listFiles();
+            File[] children = file.listFiles(f -> !f.getName().startsWith("."));
             if (children != null) {
                 for(File child : children) { item.getChildren().add(createView(child)); }
             }
@@ -46,9 +46,9 @@ public class Explorer extends TreeView<File> {
                 
                 super.updateItem(file, empty);
 
-                if (empty || file == null) setText(null);
+                if(empty || file == null) setText(null);
                 else {
-                    if (file.getName().isEmpty()) setText(file.getAbsolutePath());
+                    if(file.getName().isEmpty()) setText(file.getAbsolutePath());
                     else setText(file.getName());
                 }
 
