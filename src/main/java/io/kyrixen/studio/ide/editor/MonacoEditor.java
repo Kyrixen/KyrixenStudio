@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,6 +22,7 @@ import io.kyrixen.studio.Vars;
 import io.kyrixen.studio.ide.shells.JSConsole;
 import io.kyrixen.studio.project.Project;
 import io.kyrixen.studio.project.ProjectGenerator;
+import javafx.application.Platform;
 import javafx.concurrent.Worker;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.web.WebEngine;
@@ -46,7 +48,7 @@ public class MonacoEditor extends BorderPane {
     private final Path monacoPath = Paths.get(Vars.studioPath).resolve(".internal/monaco");
 
 
-    public MonacoEditor(Project project, Editor editor, int port) {
+    public MonacoEditor(Project project, Editor editor, JSConsole jsConsole, int port) {
         
         this.project = project;
         this.editor = editor;
@@ -62,7 +64,7 @@ public class MonacoEditor extends BorderPane {
 
                 JSObject window = (JSObject) webEngine.executeScript("window");
 
-                window.setMember("consoleBridge", new JSConsole());
+                window.setMember("consoleBridge", jsConsole);
                 window.setMember("studio", this);
             
             }
@@ -82,7 +84,7 @@ public class MonacoEditor extends BorderPane {
         webEngine.executeScript("window.setupLSP(" + editorPort + ");");
 
         if(!waitFiles.isEmpty()) {
-            for(File waitFile : waitFiles) { open(waitFile); }
+            for(File waitFile : waitFiles) { open(waitFile, 1, 1); }
             waitFiles.clear();
         }
 
@@ -92,15 +94,48 @@ public class MonacoEditor extends BorderPane {
         return project.getLocation().toUri().toString();
     }
 
+    public String getProjectName() {
+        return project.getName();
+    }
 
-    public void open(File file) {
+
+    public void open(File file, int line, int column) {
 
         if(!editorInit) { waitFiles.add(file); return; }
+        
+        Platform.runLater(() -> {
+            webEngine.executeScript("""
+                window.openFile("%s", %d, %d);
+                """.formatted(file.getAbsolutePath().replace("\\", "\\\\"), line, column));
+        });
 
-        webEngine.executeScript("""
-            window.openFile("%s");
-        """.formatted(file.getAbsolutePath().replace("\\", "\\\\")));
+    }
 
+
+    public void openFile(String path, int line, int column) {
+
+        if(path.startsWith("jdt://")) {
+            
+            Platform.runLater(() ->
+                webEngine.executeScript("""
+                    window.openFile("%s", %d, %d);
+                """.formatted(path, line, column)));
+    
+            return;
+    
+        }
+
+        if(path.startsWith("file://")) {
+            
+            try {
+                editor.open(Paths.get(URI.create(path)).toFile(), line, column);
+            } catch (AbstractMethodError e) { e.printStackTrace(); }
+            
+            return;
+        }
+
+        editor.open(Paths.get(path).toFile(), line, column);
+    
     }
 
     public String readFile(String path) {

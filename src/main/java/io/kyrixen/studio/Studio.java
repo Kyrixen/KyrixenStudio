@@ -24,7 +24,7 @@ public class Studio extends Application {
 
     private void setupStudio() {
 
-        Logger.LOGGER.setDebug(true);
+        Logger.LOGGER.setDebug(Vars.DEBUG);
 
         try {
             Files.createDirectories(Paths.get(Vars.studioPath + "/.internal/"));

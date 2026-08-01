@@ -46,6 +46,39 @@
 }
 
 
+.styled-text-area {
+    -fx-background-color: #252526;
+    -fx-highlight-fill: #264f78;
+    -fx-highlight-text-fill: white;
+}
+
+.styled-text-area .content {
+    -fx-background-color: #252526;
+}
+
+
+.styled-text-area .scroll-bar {
+    -fx-background-color: #252526;
+}
+
+.styled-text-area .scroll-bar .track {
+    -fx-background-color: #252526;
+}
+
+.styled-text-area .scroll-bar .thumb {
+    -fx-background-color: #4a4a4a;
+    -fx-background-radius: 4;
+}
+
+.styled-text-area .scroll-bar .thumb:hover {
+    -fx-background-color: #5a5a5a;
+}
+
+.styled-text-area .scroll-bar .increment-button,
+.styled-text-area .scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+}
+
 
 .menu-bar {
     -fx-background-color: #252526;

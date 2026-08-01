@@ -2,7 +2,7 @@ import * as monaco from "monaco-editor";
 
 import editorWorker from "monaco-editor/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/language/json/json.worker?worker";
-import { startLSP, didOpen, didClose, didChange, didSave, hover } from "./lsp";
+import { startLSP, didOpen, didClose, didChange, didSave, hover, definition, classFileContents } from "./lsp";
 
 self.MonacoEnvironment = {
     getWorker(_, label) {
@@ -25,6 +25,7 @@ const response = await fetch("./themes/kyrixen-dark.json");
 const theme = await response.json();
 
 monaco.editor.defineTheme("kyrixen-dark", theme);
+
 monaco.languages.register({id: "java"});
 monaco.languages.registerHoverProvider("java", {
 
@@ -50,11 +51,44 @@ monaco.languages.registerHoverProvider("java", {
 
             return { contents };
         
-        } catch(e) { window.consoleBridge.error(e); return null; }
+        } catch(e) { window.consoleBridge.error("HOVER", e); return null; }
 
     }
 
 });
+monaco.languages.registerDefinitionProvider("java", {
+
+    async provideDefinition(model, position) {
+
+        try {
+
+            const response = await definition(model.uri.toString(), position.lineNumber - 1, position.column - 1);
+            if(!response || response.length === 0) return null;
+            
+            const location = response[0];
+            window.studio.openFile(response[0].uri, location.range.start.line + 1, location.range.start.character + 1);
+            
+            return response.map(location => ({
+
+                uri: monaco.Uri.parse(location.uri),
+
+                range: {
+
+                    startLineNumber: location.range.start.line + 1,
+                    startColumn: location.range.start.character + 1,
+                    endLineNumber: location.range.end.line + 1,
+                    endColumn: location.range.end.character + 1
+
+                }
+
+            }));
+
+        } catch(e) { window.consoleBridge.error("DEFINITION", e); return null; }
+
+    }
+
+});
+
 
 const container = document.getElementById("container");
 editor = monaco.editor.create(container, {
@@ -73,6 +107,11 @@ editor = monaco.editor.create(container, {
     fontLigatures: true
 
 });
+editor.onDidChangeModel(() => {
+    const model = editor.getModel();
+    editor.updateOptions({readOnly: model?.uri.scheme === "jdt"});
+});
+
 
 export async function setupLSP(port) {
     await startLSP(port);
@@ -80,18 +119,23 @@ export async function setupLSP(port) {
 window.setupLSP = setupLSP;
 
 
-window.openFile = function(path) {
+window.openFile = async function(path, line, column) {
 
-    if(!editor) { window.consoleBridge.warn("Editor not created yet"); return; }
+    if(!editor) { window.consoleBridge.warn("EDITOR", "Editor not created yet"); return; }
 
-    const text = window.studio.readFile(path);
+    let text;
+    let uri;
+    if(path.startsWith("jdt://")) { text = await classFileContents(path); uri = monaco.Uri.parse(path); }
+    else { text = window.studio.readFile(path); uri = monaco.Uri.file(path); }
+
 
     let model = models.get(path);
     if(!model) {
-    
-        model = monaco.editor.createModel(text, getLanguage(path), monaco.Uri.file(path));
+
+        model = monaco.editor.createModel(text, getLanguage(path), uri);
     
         model.onDidChangeContent(() => {
+            if(model.uri.scheme === "jdt") return;
             window.studio.markSaved(model.uri.fsPath, false);
         });
 
@@ -103,27 +147,32 @@ window.openFile = function(path) {
 
             model.onDidChangeContent(() => {
                 if(!openedJdt.has(model.uri.toString())) return;
+                if(model.uri.scheme === "jdt") return;
                 const version = (jdtFileVer.get(model.uri.toString()) ?? 1) + 1;
                 jdtFileVer.set(model.uri.toString(), version);
                 didChange(model.uri.toString(), version, model.getValue());
-                window.consoleBridge.debug("didChange v" + jdtFileVer.get(model.uri.toString()) + ": " + model.uri.toString());
+                window.consoleBridge.INFO("CHANGE", "didChange v" + jdtFileVer.get(model.uri.toString()) + ": " + model.uri.toString());
             });
         }
     
     }
 
-    if(model.getLanguageId() === "java" && !openedJdt.has(model.uri.toString())) {
+    if(model.getLanguageId() === "java" && model.uri.scheme !== "jdt" && !openedJdt.has(model.uri.toString())) {
 
         openedJdt.add(model.uri.toString());
 
         didOpen(model.uri.toString(), text);
-        window.consoleBridge.debug("didOpen: " + model.uri.toString());
+        window.consoleBridge.info("OPEN", "didOpen: " + model.uri.toString());
 
     }
 
-    window.consoleBridge.debug("Model: " + model);
+    window.consoleBridge.debug("MODEL", "Model: " + model);
 
     editor.setModel(model);
+
+    editor.setPosition({lineNumber: line, column: column});
+    editor.revealPositionInCenter({lineNumber: line, column: column});
+    
     editor.focus();
 
 };
@@ -134,11 +183,13 @@ export function requestSave() {
     
     const model = editor.getModel();
     if(!model) return;
+    
+    if (model.uri.scheme === "jdt") return;
 
     window.studio.saveFile(model.uri.fsPath, model.getValue());
     window.studio.markSaved(model.uri.fsPath, true);
 
-    if(model.getLanguageId() === "java") { didSave(model.uri.toString()); window.consoleBridge.debug("didSave: " + model.uri.toString()); }
+    if(model.getLanguageId() === "java") { didSave(model.uri.toString()); window.consoleBridge.info("SAVE", "didSave: " + model.uri.toString()); }
 
 }
 window.requestSave = requestSave;
@@ -149,11 +200,11 @@ export function closeFile(path) {
     const model = models.get(path);
     if(!model) return;
 
-    if(model.getLanguageId() === "java") {
+    if(model.getLanguageId() === "java" && model.uri.scheme !== "jdt") {
         didClose(model.uri.toString());
         jdtFileVer.delete(model.uri.toString());
         openedJdt.delete(model.uri.toString());
-        window.consoleBridge.debug("didClose: " + model.uri.toString());
+        window.consoleBridge.info("CLOSE", "didClose: " + model.uri.toString());
     }
 
     model.dispose();
@@ -176,8 +227,9 @@ editor.addAction({
 
 function getLanguage(name) {
 
-    window.consoleBridge.debug("Prefix: " + name.split(".")[1]);
-
+    window.consoleBridge.info("LANGUAGE", "Extension: " + (name.includes(".") ? name.substring(name.lastIndexOf('.') + 1) : ""));
+    
+    if(name.startsWith("jdt://")) return "java";
     if(name.endsWith(".java")) return "java";
     if(name.endsWith(".json")) return "json";
     if(name.endsWith(".gradle")) return "groovy";

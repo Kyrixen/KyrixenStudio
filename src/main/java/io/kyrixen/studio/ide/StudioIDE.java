@@ -11,6 +11,7 @@ import io.kyrixen.studio.ide.editor.Editor;
 import io.kyrixen.studio.ide.lsp.Bridge;
 import io.kyrixen.studio.ide.lsp.JDT;
 import io.kyrixen.studio.ide.shells.Console;
+import io.kyrixen.studio.ide.shells.JSConsole;
 import io.kyrixen.studio.ide.shells.Terminal;
 import io.kyrixen.studio.project.Project;
 import javafx.geometry.Orientation;
@@ -34,6 +35,7 @@ public class StudioIDE {
     private final BorderPane root;
 
     private final Editor editor;
+    private final JSConsole jsConsole;
 
     private final Project project;
     private final JDT jdtls;
@@ -57,7 +59,8 @@ public class StudioIDE {
         bridge = new Bridge(new InetSocketAddress("127.0.0.1", port), jdtls);
         bridge.start();
         
-        this.editor = new Editor(project, port);
+        this.jsConsole = new JSConsole();
+        this.editor = new Editor(project, jsConsole, port);
         
         initializeStage();
         initializeLayout();
@@ -89,7 +92,7 @@ public class StudioIDE {
         editor.setMinWidth(550);
         editor.setMinHeight(240);
 
-        TabPane consoles = new TabPane(new Console(), new Terminal());
+        TabPane consoles = new TabPane(new Console(), jsConsole, new Terminal());
         consoles.setMinHeight(140);
         consoles.setMinWidth(300);
 
@@ -118,9 +121,10 @@ public class StudioIDE {
         Menu file = new Menu("File");
         Menu edit = new Menu("Edit");
         Menu project = new Menu("Project");
+        Menu view = new Menu("View");
         Menu tools = new Menu("Tools");
 
-        MenuBar menuBar = new MenuBar(file, edit, project, tools);
+        MenuBar menuBar = new MenuBar(file, edit, project, view, tools);
         header.getChildren().add(menuBar);
 
 

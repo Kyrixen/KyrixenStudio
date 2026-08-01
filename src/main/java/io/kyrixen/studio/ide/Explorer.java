@@ -63,7 +63,7 @@ public class Explorer extends TreeView<File> {
         this.getSelectionModel().selectedItemProperty().addListener((obs, oldItem, newItem) -> {
             if(newItem == null) return;
             File file = newItem.getValue();
-            if(file.isFile()) editor.open(file);
+            if(file.isFile()) editor.open(file, 1, 1);
         
         });
 

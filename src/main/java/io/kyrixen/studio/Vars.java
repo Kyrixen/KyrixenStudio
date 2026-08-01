@@ -8,4 +8,6 @@ public class Vars {
 
     public static final String studioPath = System.getProperty("user.home") + "/kstudio";
 
+    public static final boolean DEBUG = true;
+
 }

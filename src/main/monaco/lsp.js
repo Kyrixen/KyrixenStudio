@@ -14,20 +14,52 @@ export function startLSP(port) {
 
         socket.onopen = async () => {
 
-            window.consoleBridge.info("Connected to JDT bridge");
+            window.consoleBridge.info("LSP", "Connected to JDT bridge");
 
             try {
 
                 const response = await request("initialize", {
-                        
+                    
                     processId: null,
                     rootUri: window.studio.getProjectUri(),
-                    capabilities: {}
+
+                    capabilities: {
+                        
+                        workspace: {
+                            configuration: true,
+                            workspaceFolders: true
+                        },
+
+                        textDocument: {
+                            
+                            hover: {contentFormat: ["markdown", "plaintext"]},
+
+                            definition: {linkSupport: true},
+                            declaration: {linkSupport: true},
+                            typeDefinition: {linkSupport: true},
+                            implementation: {linkSupport: true}
+                        
+                        }
                     
+                    },
+
+                    initializationOptions: {
+
+                        workspaceFolders: [window.studio.getProjectUri()],
+                        settings: {java: {}},
+                        extendedClientCapabilities: {classFileContentsSupport: true}
+
+                    },
+
+                    workspaceFolders: [{
+                        uri: window.studio.getProjectUri(),
+                        name: window.studio.getProjectName()
+                    }]
+
                 });
 
                 notifyNow("initialized", {});
-                window.consoleBridge.info(JSON.stringify(response));
+                window.consoleBridge.debug("REQUEST", JSON.stringify(response));
                 resolve(response);
 
             } catch(e) { initialized = null; reject(e); }
@@ -49,11 +81,16 @@ export function startLSP(port) {
             
             }
 
-            window.consoleBridge.debug("[JDT -> JS] " + event.data);
+            if(msg.id && msg.method) { handleServerRequest(msg); return; }
+
+            if(msg.method) { handleNotification(msg); }
+
+
+            window.consoleBridge.debug("NOTIFICATION", event.data);
 
         }
-        socket.onclose = () => { window.consoleBridge.warn("JDT bridge disconnected"); socket = null; initialized = null; };
-        socket.onerror = (e) => { window.consoleBridge.error("WebSocket error: " + e); initialized = null; reject(e); };
+        socket.onclose = () => { window.consoleBridge.warn("LSP", "JDT bridge disconnected"); socket = null; initialized = null; };
+        socket.onerror = (e) => { window.consoleBridge.error("LSP", "WebSocket error: " + e); initialized = null; reject(e); };
 
     });
 
@@ -77,15 +114,40 @@ export function request(method, params) {
 
 }
 
+export async function classFileContents(uri) {
+    await startLSP();
+    return request("java/classFileContents", {textDocument: {uri}});
+}
+
 
 async function notify(method, params) {
-    await startLSP();
     notifyNow(method, params);
 }
 
 function notifyNow(method, params) {
-    if(!socket || socket.readyState !== WebSocket.OPEN) { window.consoleBridge.error("LSP socket is not connected."); return; }
+    if(!socket || socket.readyState !== WebSocket.OPEN) { window.consoleBridge.error("LSP", "LSP socket is not connected."); return; }
     socket.send(JSON.stringify({jsonrpc: "2.0", method, params}));
+}
+
+async function handleServerRequest(msg) {
+    
+    window.consoleBridge.debug("REQUEST",  msg.method + "\n" + JSON.stringify(msg.params, null, 2));
+    
+    switch(msg.method) {
+
+        case "workspace/configuration":
+            socket.send(JSON.stringify({jsonrpc: "2.0", id: msg.id, result: msg.params.items.map(() => ({}))}));
+            break;
+
+        default:
+            socket.send(JSON.stringify({jsonrpc:"2.0", id: msg.id, result:null}));
+    
+    }
+
+}
+
+function handleNotification(msg) {
+    window.consoleBridge.debug("NOTIFICATION", JSON.stringify(msg));
 }
 
 
@@ -150,6 +212,25 @@ export async function hover(uri, line, character) {
     await startLSP();
 
     return request("textDocument/hover", {
+
+        textDocument: {
+            uri
+        },
+
+        position: {
+            line,
+            character
+        }
+
+    });
+
+}
+
+export async function definition(uri, line, character) {
+
+    await startLSP();
+
+    return request("textDocument/definition", {
 
         textDocument: {
             uri

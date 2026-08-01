@@ -3,6 +3,7 @@ package io.kyrixen.studio.ide.editor;
 import java.io.File;
 import java.util.List;
 
+import io.kyrixen.studio.ide.shells.JSConsole;
 import io.kyrixen.studio.project.Project;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Pos;
@@ -22,10 +23,10 @@ public class Editor extends BorderPane {
     private final StackPane bg_placeholder = new StackPane();
 
 
-    public Editor(Project project, int port) {
+    public Editor(Project project, JSConsole jsConsole, int port) {
         
         this.tabs = new TabPane();
-        this.monaco = new MonacoEditor(project, this, port);
+        this.monaco = new MonacoEditor(project, this, jsConsole, port);
 
         setupPlaceholder();
 
@@ -33,7 +34,7 @@ public class Editor extends BorderPane {
         updateCenter();
 
         tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-            if(newTab instanceof EditorTab tab) monaco.open(tab.getFile());
+            if(newTab instanceof EditorTab tab) monaco.open(tab.getFile(), 1, 1);
         });
 
         tabs.getTabs().addListener((ListChangeListener<Tab>) change -> updateCenter());
@@ -61,7 +62,7 @@ public class Editor extends BorderPane {
     }
 
 
-    public void open(File file) {
+    public void open(File file, int line, int column) {
 
         EditorTab tab = findTab(file);
 
@@ -72,7 +73,7 @@ public class Editor extends BorderPane {
 
         tabs.getSelectionModel().select(tab);
 
-        monaco.open(file);
+        monaco.open(file, line, column);
 
         tab.setOnClosed(event -> monaco.close(file));
 
