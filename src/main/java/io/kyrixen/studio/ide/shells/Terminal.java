@@ -6,7 +6,7 @@ public class Terminal extends Tab {
 
     // Coming soon
     public Terminal() {
-        this.setText("Terminal");
+        this.setText("Terminal (Coming soon)");
     }
 
 }

@@ -63,25 +63,16 @@ monaco.languages.registerDefinitionProvider("java", {
         try {
 
             const response = await definition(model.uri.toString(), position.lineNumber - 1, position.column - 1);
-            if(!response || response.length === 0) return null;
             
-            const location = response[0];
-            window.studio.openFile(response[0].uri, location.range.start.line + 1, location.range.start.character + 1);
+            const locations = Array.isArray(response) ? response : (response ? [response] : []);
+            if(locations.length === 0) return null;
             
-            return response.map(location => ({
+            const location = normalizeDefinitionLocation(locations[0]);
+            if(!location) return null;
 
-                uri: monaco.Uri.parse(location.uri),
+            window.studio.openFile(location.uri, location.range.start.line + 1, location.range.start.character + 1);
 
-                range: {
-
-                    startLineNumber: location.range.start.line + 1,
-                    startColumn: location.range.start.character + 1,
-                    endLineNumber: location.range.end.line + 1,
-                    endColumn: location.range.end.character + 1
-
-                }
-
-            }));
+            return null;
 
         } catch(e) { window.consoleBridge.error("DEFINITION", e); return null; }
 
@@ -236,6 +227,19 @@ function getLanguage(name) {
     if(name.endsWith(".md")) return "markdown";
 
     return "plaintext";
+
+}
+
+
+function normalizeDefinitionLocation(location) {
+
+    if(!location) return null;
+
+    const uri = location.uri ?? location.targetUri;
+    const range = location.range ?? location.targetSelectionRange ?? location.targetRange;
+    if(!uri || !range?.start) { window.consoleBridge.warn("DEFINITION", "Unsupported location: " + JSON.stringify(location)); return null; }
+
+    return { uri, range };
 
 }
 

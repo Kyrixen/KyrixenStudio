@@ -110,20 +110,23 @@ public class MonacoEditor extends BorderPane {
         });
 
     }
+    
+    public void openDec(String jdtUri, int line, int column) {
+
+        if(!editorInit) return;
+        
+        Platform.runLater(() -> {
+            webEngine.executeScript("""
+                window.openFile("%s", %d, %d);
+                """.formatted(jdtUri.replace("\\", "\\\\"), line, column));
+        });
+
+    }
 
 
     public void openFile(String path, int line, int column) {
 
-        if(path.startsWith("jdt://")) {
-            
-            Platform.runLater(() ->
-                webEngine.executeScript("""
-                    window.openFile("%s", %d, %d);
-                """.formatted(path, line, column)));
-    
-            return;
-    
-        }
+        if(path.startsWith("jdt://")) { editor.openDecompiled(path, line, column); return; }
 
         if(path.startsWith("file://")) {
             
@@ -301,6 +304,17 @@ public class MonacoEditor extends BorderPane {
         """.formatted(file.getAbsolutePath().replace("\\", "\\\\")));
 
     }
+
+    public void closeDec(String jdtUri) {
+
+        if(!editorInit) return;
+
+        webEngine.executeScript("""
+            window.closeFile("%s");
+        """.formatted(jdtUri));
+    
+    }
+
 
     public void stop() {
         if(server != null) server.stop(0);   

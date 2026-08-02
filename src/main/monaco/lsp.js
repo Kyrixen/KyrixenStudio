@@ -5,6 +5,25 @@ let nextId = 1;
 const pending = new Map();
 
 
+let projectImport;
+const javaSettings = {
+    
+    import: {
+        
+        gradle: {
+            enabled: true,
+            wrapper: { enabled: true }
+        },
+        
+        maven: { enabled: true }
+    
+    },
+    
+    configuration: { updateBuildConfiguration: "automatic" }
+
+};
+
+
 export function startLSP(port) {
 
     if(initialized) return initialized;
@@ -15,7 +34,6 @@ export function startLSP(port) {
         socket.onopen = async () => {
 
             window.consoleBridge.info("LSP", "Connected to JDT bridge");
-
             try {
 
                 const response = await request("initialize", {
@@ -46,8 +64,9 @@ export function startLSP(port) {
                     initializationOptions: {
 
                         workspaceFolders: [window.studio.getProjectUri()],
-                        settings: {java: {}},
-                        extendedClientCapabilities: {classFileContentsSupport: true}
+                        settings: { java: javaSettings },
+
+                        extendedClientCapabilities: { classFileContentsSupport: true }
 
                     },
 
@@ -59,6 +78,9 @@ export function startLSP(port) {
                 });
 
                 notifyNow("initialized", {});
+                
+                projectImport = importJavaProject();
+                
                 window.consoleBridge.debug("REQUEST", JSON.stringify(response));
                 resolve(response);
 
@@ -115,8 +137,18 @@ export function request(method, params) {
 }
 
 export async function classFileContents(uri) {
+    
     await startLSP();
-    return request("java/classFileContents", {textDocument: {uri}});
+
+    window.consoleBridge.info("CLASS", uri);
+    const text = await request("workspace/executeCommand", {
+        command: "java.decompile",
+        arguments: [uri]
+    });
+    window.consoleBridge.info("CLASS", "Contents: " + JSON.stringify(text));
+    
+    return text;
+
 }
 
 
@@ -136,13 +168,37 @@ async function handleServerRequest(msg) {
     switch(msg.method) {
 
         case "workspace/configuration":
-            socket.send(JSON.stringify({jsonrpc: "2.0", id: msg.id, result: msg.params.items.map(() => ({}))}));
+            socket.send(JSON.stringify({
+            
+                jsonrpc: "2.0",
+                id: msg.id,
+                result: msg.params.items.map(item => getConfiguration(item.section))
+            
+            }));
             break;
 
         default:
             socket.send(JSON.stringify({jsonrpc:"2.0", id: msg.id, result:null}));
     
     }
+
+}
+
+function getConfiguration(section) {
+
+    if(!section) return { java: javaSettings };
+    if(section === "java") return javaSettings;
+    if(section.startsWith("java.")) return section.split(".").slice(1).reduce((value, key) => value?.[key], javaSettings);
+    return {};
+
+}
+
+async function importJavaProject() {
+
+    try {
+        await request("workspace/executeCommand", { command: "java.project.import" });
+        window.consoleBridge.info("IMPORT", "Requested Java project import");
+    } catch(e) { window.consoleBridge.warn("IMPORT", "Java project import command failed: " + JSON.stringify(e)); }
 
 }
 
@@ -229,6 +285,8 @@ export async function hover(uri, line, character) {
 export async function definition(uri, line, character) {
 
     await startLSP();
+    
+    if(projectImport) await projectImport;
 
     return request("textDocument/definition", {
 

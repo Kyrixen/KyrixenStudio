@@ -34,7 +34,8 @@ public class Editor extends BorderPane {
         updateCenter();
 
         tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-            if(newTab instanceof EditorTab tab) monaco.open(tab.getFile(), 1, 1);
+            if(newTab instanceof FileTab fTab) monaco.open(fTab.getFile(), 1, 1);
+            if(newTab instanceof JdtTab jTab) monaco.openDec(jTab.getJdtUri(), 1, 1);
         });
 
         tabs.getTabs().addListener((ListChangeListener<Tab>) change -> updateCenter());
@@ -64,26 +65,42 @@ public class Editor extends BorderPane {
 
     public void open(File file, int line, int column) {
 
-        EditorTab tab = findTab(file);
+        FileTab tab = findTab(file);
 
         if(tab == null) {
-            tab = new EditorTab(file);
+            tab = new FileTab(file);
             tabs.getTabs().add(tab);
         }
 
         tabs.getSelectionModel().select(tab);
 
         monaco.open(file, line, column);
-
         tab.setOnClosed(event -> monaco.close(file));
 
     }
+
+    public void openDecompiled(String jdtUri, int line, int column) {
+
+        JdtTab tab = findTab(jdtUri);
+
+        if(tab == null) {
+            tab = new JdtTab(jdtUri);
+            tabs.getTabs().add(tab);
+        }
+
+        tabs.getSelectionModel().select(tab);
+
+        monaco.openDec(jdtUri, line, column);
+        tab.setOnClosed(event -> monaco.closeDec(jdtUri));
+
+    }
+
 
     public void isDirty(String file, boolean dirty) {
 
         File f = new File(file);
 
-        EditorTab tab = findTab(f);
+        FileTab tab = findTab(f);
         if(tab == null) return;
 
         if(dirty) tab.setText(f.getName() + " *");
@@ -92,10 +109,19 @@ public class Editor extends BorderPane {
     }
 
 
-    private EditorTab findTab(File file) {
+    private FileTab findTab(File file) {
 
-        List<EditorTab> editorTabs = tabs.getTabs().stream().filter(tab -> tab instanceof EditorTab).map(editorTab -> (EditorTab) editorTab).toList();
-        for(EditorTab eTab : editorTabs) { if(eTab.getFile().toPath().equals(file.toPath())) return eTab; }
+        List<FileTab> fileTabs = tabs.getTabs().stream().filter(tab -> tab instanceof FileTab).map(fileTab -> (FileTab) fileTab).toList();
+        for(FileTab fTab : fileTabs) { if(fTab.getFile().toPath().equals(file.toPath())) return fTab; }
+
+        return null;
+
+    }
+    
+    private JdtTab findTab(String jdtUri) {
+
+        List<JdtTab> jdtTabs = tabs.getTabs().stream().filter(tab -> tab instanceof JdtTab).map(jdtTab -> (JdtTab) jdtTab).toList();
+        for(JdtTab jTab : jdtTabs) { if(jTab.getJdtUri().equals(jdtUri)) return jTab; }
 
         return null;
 

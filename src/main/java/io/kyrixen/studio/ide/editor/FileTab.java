@@ -4,12 +4,12 @@ import java.io.File;
 
 import javafx.scene.control.Tab;
 
-public class EditorTab extends Tab {
+public class FileTab extends Tab {
 
     private final File file;
 
 
-    public EditorTab(File file) {
+    public FileTab(File file) {
         this.file = file;
         setText(file.getName());
     }

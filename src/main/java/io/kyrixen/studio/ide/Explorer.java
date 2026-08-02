@@ -27,7 +27,7 @@ public class Explorer extends TreeView<File> {
         TreeItem<File> item = new TreeItem<>(file);
 
         if(file.isDirectory()) {
-            File[] children = file.listFiles(f -> !f.getName().startsWith("."));
+            File[] children = file.listFiles(f -> !f.getName().startsWith(".") && !f.getName().equals("bin"));
             if (children != null) {
                 for(File child : children) { item.getChildren().add(createView(child)); }
             }
